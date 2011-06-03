@@ -28,7 +28,9 @@ public abstract class SqlEntryStorage implements Storage {
     static PreparedStatementPool permAddPool;
     protected static final String permRemText = "DELETE FROM PrPermissions WHERE entryid = ? AND permstring = ?;";
     static PreparedStatementPool permRemPool;
-    protected static final String parentAddText = "INSERT IGNORE INTO PrInheritance (childid, parentid) VALUES (?,?);";
+    protected static final String maxParentText = "SELECT MAX(parentorder) FROM PrInheritance WHERE childid = ?;";
+    static PreparedStatementPool maxParentPool;
+    protected static final String parentAddText = "INSERT IGNORE INTO PrInheritance (childid, parentid, parentorder) VALUES (?,?,?);";
     static PreparedStatementPool parentAddPool;
     protected static final String parentRemText = "DELETE FROM PrInheritance WHERE childid = ? AND parentid = ?;";
     static PreparedStatementPool parentRemPool;
@@ -52,6 +54,7 @@ public abstract class SqlEntryStorage implements Storage {
         permAddPool = new PreparedStatementPool(dbConn, (dbms == Dbms.SQLITE ? permAddText.replace("IGNORE", "OR IGNORE") : permAddText), max);
         permRemPool = new PreparedStatementPool(dbConn, permRemText, max);
         parentAddPool = new PreparedStatementPool(dbConn, (dbms == Dbms.SQLITE ? parentAddText.replace("IGNORE", "OR IGNORE") : parentAddText), max);
+        maxParentPool = new PreparedStatementPool(dbConn, maxParentText, max);
         parentRemPool = new PreparedStatementPool(dbConn, parentRemText, max);
         entryListPool = new PreparedStatementPool(dbConn, entryListText, max);
         entryDelPool = new PreparedStatementPool(dbConn, entryDelText, max);
@@ -155,7 +158,16 @@ public abstract class SqlEntryStorage implements Storage {
             e.printStackTrace();
             return;
         }
-        SqlStorage.runUpdate(parentAddPool, new Object[] { uid, gid });
+        int parentOrder = 0;
+        List<Map<Integer, Object>> results = SqlStorage.runQuery(maxParentPool, new Object[] {uid}, true, 1);
+        if(results != null && !results.isEmpty()) {
+            Object o = results.get(0).get(1);
+            if(o instanceof Integer) {
+                parentOrder = (Integer) o;
+            }
+        }
+        parentOrder ++;
+        SqlStorage.runUpdate(parentAddPool, new Object[] { uid, gid, parentOrder });
     }
 
     @Override
