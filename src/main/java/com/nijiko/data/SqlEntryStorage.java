@@ -38,7 +38,7 @@ public abstract class SqlEntryStorage implements Storage {
     protected static final String entryDelText = "DELETE FROM PrEntries WHERE worldid = ? AND entryid = ?;";
     static PreparedStatementPool entryDelPool;
 
-    protected static final String dataGetText = "SELECT * FROM PrData WHERE entryid = ? AND path = ?;";
+    protected static final String dataGetText = "SELECT data FROM PrData WHERE entryid = ? AND path = ?;";
     static PreparedStatementPool dataGetPool;
     protected static final String dataModText = "REPLACE INTO PrData (data, entryid, path) VALUES (?,?,?);";
     static PreparedStatementPool dataModPool;
@@ -244,7 +244,7 @@ public abstract class SqlEntryStorage implements Storage {
             e.printStackTrace();
             return data;
         }
-        List<Map<Integer, Object>> results = SqlStorage.runQuery(dataGetPool, new Object[] { uid, path }, true, 1, 2);
+        List<Map<Integer, Object>> results = SqlStorage.runQuery(dataGetPool, new Object[] { uid, path }, true, 1);
         for (Map<Integer, Object> row : results) {
             Object o = row.get(1);
             if (o instanceof String) {
