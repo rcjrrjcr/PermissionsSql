@@ -1,0 +1,7 @@
+name: PermissionsSql
+main: com.nijikokun.bukkit.Permissions.PermissionsSql
+version: 3.1.2
+author: rcjrrjcr
+website: www.theyeticave.net
+description: >
+             Provides SQL functionality for Permissions
