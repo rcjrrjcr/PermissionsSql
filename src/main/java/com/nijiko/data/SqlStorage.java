@@ -185,7 +185,7 @@ public abstract class SqlStorage {
 
     static int getWorld(String name) {
         if (worldMap.containsKey(name)) {
-            System.out.println(worldMap.get(name));
+//            System.out.println(worldMap.get(name));
             return worldMap.get(name);
         }
         Object[] params = new Object[] { name };
@@ -197,7 +197,7 @@ public abstract class SqlStorage {
         }
         int id = -1;
         Iterator<Map<Integer, Object>> iter = results.iterator();
-        System.out.println(results);
+//        System.out.println(results);
         if (iter.hasNext()) {
             Object o = iter.next().get(1);
             if (o instanceof Integer) {
