@@ -269,6 +269,8 @@ public abstract class SqlEntryStorage implements Storage {
     @Override
     public Integer getInt(String name, String path) {
         String raw = getString(name, path);
+        if(raw == null)
+            return null;
         Integer value;
         try {
             value = Integer.valueOf(raw);
@@ -281,6 +283,8 @@ public abstract class SqlEntryStorage implements Storage {
     @Override
     public Double getDouble(String name, String path) {
         String raw = getString(name, path);
+        if(raw == null)
+            return null;
         Double value;
         try {
             value = Double.valueOf(raw);
@@ -293,13 +297,15 @@ public abstract class SqlEntryStorage implements Storage {
     @Override
     public Boolean getBool(String name, String path) {
         String raw = getString(name, path);
-        Boolean value;
-        try {
-            value = Boolean.valueOf(raw);
-        } catch (NumberFormatException e) {
-            value = null;
+        if(raw == null)
+            return null;
+        if(raw.equalsIgnoreCase("true")) {
+            return true;
+        } else if (raw.equalsIgnoreCase("false")) {
+            return false;
+        } else {
+            return null;
         }
-        return value;
     }
 
     @Override
