@@ -1,6 +1,5 @@
 package com.nijiko.data;
 
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,48 +19,20 @@ public abstract class SqlEntryStorage implements Storage {
     protected Map<String, Integer> idCache = new HashMap<String, Integer>();
 
     protected static final String permGetText = "SELECT permstring FROM PrPermissions WHERE entryid = ?;";
-    static PreparedStatementPool permGetPool;
     protected static final String parentGetText = "SELECT parentid FROM PrInheritance WHERE childid = ? ORDER BY parentorder;";
-    static PreparedStatementPool parentGetPool;
 
     protected static final String permAddText = "INSERT IGNORE INTO PrPermissions (entryid, permstring) VALUES (?,?);";
-    static PreparedStatementPool permAddPool;
     protected static final String permRemText = "DELETE FROM PrPermissions WHERE entryid = ? AND permstring = ?;";
-    static PreparedStatementPool permRemPool;
     protected static final String maxParentText = "SELECT MAX(parentorder) FROM PrInheritance WHERE childid = ?;";
-    static PreparedStatementPool maxParentPool;
     protected static final String parentAddText = "INSERT IGNORE INTO PrInheritance (childid, parentid, parentorder) VALUES (?,?,?);";
-    static PreparedStatementPool parentAddPool;
     protected static final String parentRemText = "DELETE FROM PrInheritance WHERE childid = ? AND parentid = ?;";
-    static PreparedStatementPool parentRemPool;
 
     protected static final String entryListText = "SELECT name, entryid FROM PrEntries WHERE worldid = ? AND type = ?;";
-    static PreparedStatementPool entryListPool;
     protected static final String entryDelText = "DELETE FROM PrEntries WHERE worldid = ? AND entryid = ?;";
-    static PreparedStatementPool entryDelPool;
 
     protected static final String dataGetText = "SELECT data FROM PrData WHERE entryid = ? AND path = ?;";
-    static PreparedStatementPool dataGetPool;
     protected static final String dataModText = "REPLACE INTO PrData (data, entryid, path) VALUES (?,?,?);";
-    static PreparedStatementPool dataModPool;
     protected static final String dataDelText = "DELETE FROM PrData WHERE entryid = ? AND path = ?;";
-    static PreparedStatementPool dataDelPool;
-
-    static void reloadPools(Connection dbConn) {
-        Dbms dbms = SqlStorage.getDbms();
-        permGetPool = new PreparedStatementPool(dbConn, permGetText, max);
-        parentGetPool = new PreparedStatementPool(dbConn, parentGetText, max);
-        permAddPool = new PreparedStatementPool(dbConn, (dbms == Dbms.SQLITE ? permAddText.replace("IGNORE", "OR IGNORE") : permAddText), max);
-        permRemPool = new PreparedStatementPool(dbConn, permRemText, max);
-        parentAddPool = new PreparedStatementPool(dbConn, (dbms == Dbms.SQLITE ? parentAddText.replace("IGNORE", "OR IGNORE") : parentAddText), max);
-        maxParentPool = new PreparedStatementPool(dbConn, maxParentText, max);
-        parentRemPool = new PreparedStatementPool(dbConn, parentRemText, max);
-        entryListPool = new PreparedStatementPool(dbConn, entryListText, max);
-        entryDelPool = new PreparedStatementPool(dbConn, entryDelText, max);
-        dataModPool = new PreparedStatementPool(dbConn, dataModText, max);
-        dataDelPool = new PreparedStatementPool(dbConn, dataDelText, max);
-        dataGetPool = new PreparedStatementPool(dbConn, dataGetText, max);
-    }
 
     public SqlEntryStorage(String world, int id) {
         worldId = id;
@@ -80,7 +51,7 @@ public abstract class SqlEntryStorage implements Storage {
                 e.printStackTrace();
                 return permissions;
             }
-            List<Map<Integer, Object>> results = SqlStorage.runQuery(permGetPool, new Object[] { id }, false, 1);
+            List<Map<Integer, Object>> results = SqlStorage.runQuery(permGetText, new Object[] { id }, false, 1);
             if (results != null) {
                 for (Map<Integer, Object> row : results) {
                     Object o = row.get(1);
@@ -104,7 +75,7 @@ public abstract class SqlEntryStorage implements Storage {
                 e.printStackTrace();
                 return parents;
             }
-            List<Map<Integer, Object>> results = SqlStorage.runQuery(parentGetPool, new Object[] { uid }, false, 1);
+            List<Map<Integer, Object>> results = SqlStorage.runQuery(parentGetText, new Object[] { uid }, false, 1);
             if (results != null) {
                 for (Map<Integer, Object> row : results) {
                     Object o = row.get(1);
@@ -132,7 +103,7 @@ public abstract class SqlEntryStorage implements Storage {
             e.printStackTrace();
             return;
         }
-        SqlStorage.runUpdate(permAddPool, new Object[] { uid, permission });
+        SqlStorage.runUpdate(permAddText, new Object[] { uid, permission });
     }
 
     @Override
@@ -144,7 +115,7 @@ public abstract class SqlEntryStorage implements Storage {
             e.printStackTrace();
             return;
         }
-        SqlStorage.runUpdate(permRemPool, new Object[] { uid, permission });
+        SqlStorage.runUpdate(permRemText, new Object[] { uid, permission });
     }
 
     @Override
@@ -159,7 +130,7 @@ public abstract class SqlEntryStorage implements Storage {
             return;
         }
         int parentOrder = 0;
-        List<Map<Integer, Object>> results = SqlStorage.runQuery(maxParentPool, new Object[] {uid}, true, 1);
+        List<Map<Integer, Object>> results = SqlStorage.runQuery(maxParentText, new Object[] {uid}, true, 1);
         if(results != null && !results.isEmpty()) {
             Object o = results.get(0).get(1);
             if(o instanceof Integer) {
@@ -167,7 +138,7 @@ public abstract class SqlEntryStorage implements Storage {
             }
         }
         parentOrder ++;
-        SqlStorage.runUpdate(parentAddPool, new Object[] { uid, gid, parentOrder });
+        SqlStorage.runUpdate(parentAddText, new Object[] { uid, gid, parentOrder });
     }
 
     @Override
@@ -181,13 +152,13 @@ public abstract class SqlEntryStorage implements Storage {
             e.printStackTrace();
             return;
         }
-        SqlStorage.runUpdate(parentRemPool, new Object[] { uid, gid });
+        SqlStorage.runUpdate(parentRemText, new Object[] { uid, gid });
     }
 
     @Override
     public Set<String> getEntries() {
         if (idCache.isEmpty()) {
-            List<Map<Integer, Object>> results = SqlStorage.runQuery(entryListPool, new Object[] { worldId, (byte) (this.getType() == EntryType.GROUP ? 1 : 0) }, false, 1, 2);
+            List<Map<Integer, Object>> results = SqlStorage.runQuery(entryListText, new Object[] { worldId, (byte) (this.getType() == EntryType.GROUP ? 1 : 0) }, false, 1, 2);
             for (Map<Integer, Object> row : results) {
                 Object oName = row.get(1);
                 Object oId = row.get(2);
@@ -242,7 +213,7 @@ public abstract class SqlEntryStorage implements Storage {
     @Override
     public boolean delete(String name) {
         int id = idCache.remove(name);
-        int val = SqlStorage.runUpdate(entryDelPool, new Object[] {worldId, id});
+        int val = SqlStorage.runUpdate(entryDelText, new Object[] {worldId, id});
         return val != 0;        
     }
 
@@ -256,7 +227,7 @@ public abstract class SqlEntryStorage implements Storage {
             e.printStackTrace();
             return data;
         }
-        List<Map<Integer, Object>> results = SqlStorage.runQuery(dataGetPool, new Object[] { uid, path }, true, 1);
+        List<Map<Integer, Object>> results = SqlStorage.runQuery(dataGetText, new Object[] { uid, path }, true, 1);
         for (Map<Integer, Object> row : results) {
             Object o = row.get(1);
             if (o instanceof String) {
@@ -329,7 +300,7 @@ public abstract class SqlEntryStorage implements Storage {
             e.printStackTrace();
             return;
         }
-        SqlStorage.runUpdate(dataModPool, new Object[] { szForm, uid, path });
+        SqlStorage.runUpdate(dataModText, new Object[] { szForm, uid, path });
     }
 
     @Override
@@ -341,20 +312,7 @@ public abstract class SqlEntryStorage implements Storage {
             e.printStackTrace();
             return;
         }
-        SqlStorage.runUpdate(dataDelPool, new Object[] { uid, path });
-    }
-
-    public static void close() {
-        parentGetPool.close();
-        parentAddPool.close();
-        parentRemPool.close();
-        permGetPool.close();
-        permAddPool.close();
-        permRemPool.close();
-        dataGetPool.close();
-        dataModPool.close();
-        dataDelPool.close();
-        entryListPool.close();
+        SqlStorage.runUpdate(dataDelText, new Object[] { uid, path });
     }
 
     public Integer getCachedId(String name) {
