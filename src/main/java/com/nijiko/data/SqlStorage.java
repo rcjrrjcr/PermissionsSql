@@ -246,7 +246,7 @@ public abstract class SqlStorage {
     }
 
     static List<Map<Integer, Object>> runQuery(String statement, Object[] params, boolean single, int... dataCols) {
-        checkConn();
+//        checkConn();
         if (dataCols == null || dataCols.length == 0) {
             return null;
         }
@@ -276,10 +276,11 @@ public abstract class SqlStorage {
     }
 
     static int runUpdate(String statement, Object[] params) {
-        checkConn();
+//        checkConn();
+        String sql = dbms == Dbms.SQLITE ? statement.replace("INSERT IGNORE", "INSERT OR IGNORE") : statement;
         int result = -1;
         try {
-            PreparedStatement stmt = dbConn.prepareStatement(statement);
+            PreparedStatement stmt = dbConn.prepareStatement(sql);
             fillStatement(stmt, params);
             stmt.execute();
             result = stmt.getUpdateCount();
@@ -302,14 +303,14 @@ public abstract class SqlStorage {
         }
     }
 
-    private static void checkConn() {
-        try {
-            if (dbConn == null || !dbConn.isValid(1))
-                dbConn = dbSource.getConnection();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
+//    private static void checkConn() {
+//        try {
+//            if (dbConn == null || !dbConn.isValid(1))
+//                dbConn = dbSource.getConnection();
+//        } catch (SQLException e) {
+//            e.printStackTrace();
+//        }
+//    }
 }
 
 enum Dbms {
