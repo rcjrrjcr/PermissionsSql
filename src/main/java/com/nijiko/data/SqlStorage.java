@@ -251,9 +251,10 @@ public abstract class SqlStorage {
             return null;
         }
         List<Map<Integer, Object>> results = new LinkedList<Map<Integer, Object>>();
-
+        
+        PreparedStatement stmt = null;
         try {
-            PreparedStatement stmt = dbConn.prepareStatement(statement);
+            stmt = dbConn.prepareStatement(statement);
             fillStatement(stmt, params);
             if (stmt.execute()) {
                 ResultSet rs = stmt.getResultSet();
@@ -271,6 +272,13 @@ public abstract class SqlStorage {
             }
         } catch (SQLException e) {
             e.printStackTrace();
+        } finally {
+            if(stmt != null)
+                try {
+                    stmt.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
         }
         return results;
     }
@@ -279,14 +287,22 @@ public abstract class SqlStorage {
 //        checkConn();
         String sql = dbms == Dbms.SQLITE ? statement.replace("INSERT IGNORE", "INSERT OR IGNORE") : statement;
         int result = -1;
+        PreparedStatement stmt = null;
         try {
-            PreparedStatement stmt = dbConn.prepareStatement(sql);
+            stmt = dbConn.prepareStatement(sql);
             fillStatement(stmt, params);
             stmt.execute();
             result = stmt.getUpdateCount();
         } catch (SQLException e) {
             e.printStackTrace();
             result = -1;
+        } finally {
+            if(stmt != null)
+                try {
+                    stmt.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
         }
         return result;
     }
