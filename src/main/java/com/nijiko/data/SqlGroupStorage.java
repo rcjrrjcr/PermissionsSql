@@ -36,12 +36,24 @@ public class SqlGroupStorage extends SqlEntryStorage implements GroupStorage {
         Iterator<Map<Integer, Object>> iter = results.iterator();
         if(iter.hasNext()) {
             Object def = iter.next().get(1);
-            if(def instanceof String) {
-                defaultGroup = (String) def;
-                return defaultGroup.equals(name);
+            if(def instanceof Integer) {
+            	try {
+					if(this.getId(name) == (Integer) def)
+	            	{
+		                defaultGroup = name;
+		                return defaultGroup.equals(name);
+		            }
+				} catch (SQLException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
             }
         }
         return false;
+    }
+    public String getDefault()
+    {
+    	return defaultGroup;
     }
 
     @Override
