@@ -52,7 +52,10 @@ public class SqlGroupStorage extends SqlEntryStorage implements GroupStorage {
         while(iter.hasNext()) {
             Object o = iter.next().get(1);
             if(o instanceof String) {
-                tracks.add((String) o);
+                String s = (String) o;
+                if(s.equals("deftrack"))
+                    s = null;
+                tracks.add(s);
             }
         }
         return tracks;
@@ -60,6 +63,9 @@ public class SqlGroupStorage extends SqlEntryStorage implements GroupStorage {
 
     @Override
     public LinkedList<GroupWorld> getTrack(String track) {
+        if(track == null) {
+            track = "deftrack"; //Name of default SQL track
+        }
         List<Map<Integer, Object>> results = SqlStorage.runQuery(trackGetText, new Object[]{worldId, track}, false, 1);
         Iterator<Map<Integer, Object>> iter = results.iterator();
         LinkedList<GroupWorld> trackGroups = new LinkedList<GroupWorld>();

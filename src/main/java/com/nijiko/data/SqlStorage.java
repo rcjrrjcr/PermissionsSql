@@ -15,6 +15,7 @@ import javax.sql.DataSource;
 
 import org.sqlite.SQLiteDataSource;
 
+import com.mysql.jdbc.jdbc2.optional.MysqlConnectionPoolDataSource;
 import com.mysql.jdbc.jdbc2.optional.MysqlDataSource;
 
 public abstract class SqlStorage {
@@ -246,7 +247,7 @@ public abstract class SqlStorage {
     }
 
     static List<Map<Integer, Object>> runQuery(String statement, Object[] params, boolean single, int... dataCols) {
-//        checkConn();
+        checkConn();
         if (dataCols == null || dataCols.length == 0) {
             return null;
         }
@@ -284,7 +285,7 @@ public abstract class SqlStorage {
     }
 
     static int runUpdate(String statement, Object[] params) {
-//        checkConn();
+        checkConn();
         String sql = dbms == Dbms.SQLITE ? statement.replace("INSERT IGNORE", "INSERT OR IGNORE") : statement;
         int result = -1;
         PreparedStatement stmt = null;
@@ -319,14 +320,14 @@ public abstract class SqlStorage {
         }
     }
 
-//    private static void checkConn() {
-//        try {
-//            if (dbConn == null || !dbConn.isValid(1))
-//                dbConn = dbSource.getConnection();
-//        } catch (SQLException e) {
-//            e.printStackTrace();
-//        }
-//    }
+    private static void checkConn() {
+        try {
+            if (dbms == Dbms.MYSQL && (dbConn == null || !dbConn.isValid(1)) )
+                dbConn = dbSource.getConnection();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
 }
 
 enum Dbms {
@@ -350,6 +351,8 @@ enum Dbms {
             mds.setPassword(password);
             mds.setUrl(url);
             mds.setCachePreparedStatements(true);
+            mds.setPreparedStatementCacheSize(21);
+//            mds.setPreparedStatementCacheSqlLimit(308);
             return mds;
         default:
         case SQLITE:
