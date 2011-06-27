@@ -29,7 +29,6 @@ public class PermissionsSql extends JavaPlugin {
         StorageFactory.registerCreator("SQL", creator);
         getServer().getPluginManager().registerEvent(Type.CUSTOM_EVENT, pListener, Priority.Monitor, this);
         log.info("[Permissions] SQL Interface enabled!");
-
     }
 
 }

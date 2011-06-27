@@ -1,6 +1,6 @@
 name: PermissionsSql
 main: com.nijikokun.bukkit.Permissions.PermissionsSql
-version: 1.2
+version: 1.3
 author: rcjrrjcr
 website: www.theyeticave.net
 depend:

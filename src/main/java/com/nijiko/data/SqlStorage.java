@@ -15,7 +15,6 @@ import javax.sql.DataSource;
 
 import org.sqlite.SQLiteDataSource;
 
-import com.mysql.jdbc.jdbc2.optional.MysqlConnectionPoolDataSource;
 import com.mysql.jdbc.jdbc2.optional.MysqlDataSource;
 
 public abstract class SqlStorage {
@@ -51,7 +50,7 @@ public abstract class SqlStorage {
         return dbms;
     }
 
-    public static void init(String dbmsName, String uri, String username, String password, int reloadDelay) throws Exception {
+    public synchronized static void init(String dbmsName, String uri, String username, String password, int reloadDelay) throws Exception {
         if (init) {
             return;
         }
@@ -61,13 +60,13 @@ public abstract class SqlStorage {
         try {
             dbms = Dbms.valueOf(dbmsName);
         } catch (IllegalArgumentException e) {
-            System.err.println("Error occurred while selecting permissions config DBMS. Reverting to SQLite.");
+            System.err.println("[Permissions] Error occurred while selecting permissions config DBMS. Reverting to SQLite.");
             dbms = Dbms.SQLITE;
         }
         try {
             Class.forName(dbms.getDriver());
         } catch (ClassNotFoundException e) {
-            throw new Exception("Unable to load SQL driver!", e);
+            throw new Exception("[Permissions] Unable to load SQL driver!", e);
         }
         dbSource = dbms.getSource(username, password, uri);
         verifyAndCreateTables();
