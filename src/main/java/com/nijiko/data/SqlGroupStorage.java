@@ -36,8 +36,9 @@ public class SqlGroupStorage extends SqlEntryStorage implements GroupStorage {
         Iterator<Map<Integer, Object>> iter = results.iterator();
         if(iter.hasNext()) {
             Object def = iter.next().get(1);
-            if(def instanceof String) {
-                defaultGroup = (String) def;
+            if(def instanceof Integer) {
+                int defId = (Integer) def;
+                defaultGroup = SqlStorage.getEntryName(defId).name;
                 return defaultGroup.equals(name);
             }
         }

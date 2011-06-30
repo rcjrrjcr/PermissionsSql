@@ -5,5 +5,6 @@ author: rcjrrjcr
 website: www.theyeticave.net
 depend:
     - Permissions
+load: startup
 description: >
              Provides SQL functionality for Permissions

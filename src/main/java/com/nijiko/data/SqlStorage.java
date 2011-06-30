@@ -33,7 +33,8 @@ public abstract class SqlStorage {
     static final String getWorldName = "SELECT worldname FROM PrWorlds WHERE worldid = ?;";
     static final String getEntryName = "SELECT name, worldid FROM PrEntries WHERE entryid = ?;";
 
-    private static Connection dbConn;
+    //XXX: Connection objects aren't really thread safe. Either use connection pools or ThreadLocal
+    private static ConnectionPool pool;
 
     static {
         create.add("CREATE TABLE IF NOT EXISTS PrWorlds (" + " worldid INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT," + " worldname VARCHAR(32) NOT NULL UNIQUE" + ")");
@@ -55,6 +56,7 @@ public abstract class SqlStorage {
             return;
         }
 
+        
         System.out.println("[Permissions] Initializing Permissions 3 SQL interface.");
         // SqlStorage.reloadDelay = reloadDelay;
         try {
@@ -70,7 +72,7 @@ public abstract class SqlStorage {
         }
         dbSource = dbms.getSource(username, password, uri);
         verifyAndCreateTables();
-        dbConn = dbSource.getConnection();
+        pool = ConnectionPool.newInstance(dbSource, 5);
         init = true;
         clearWorldCache();
     }
@@ -222,22 +224,18 @@ public abstract class SqlStorage {
     }
 
     public synchronized static void closeAll() {
-        try {
-            if (init) {
-                userStores.clear();
-                groupStores.clear();
-                worldMap.clear();
-                dbConn.close();
-                dbSource = null;
-                init = false;
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        if (init) {
+            userStores.clear();
+            groupStores.clear();
+            worldMap.clear();
+            pool.closeAll();
+            dbSource = null;
+            init = false;
         }
     }
 
     static Connection getConnection() throws SQLException {
-        return dbSource.getConnection();
+        return pool.getConnection();
     }
 
     public static class NameWorldId {
@@ -246,14 +244,16 @@ public abstract class SqlStorage {
     }
 
     static List<Map<Integer, Object>> runQuery(String statement, Object[] params, boolean single, int... dataCols) {
-        checkConn();
         if (dataCols == null || dataCols.length == 0) {
             return null;
         }
         List<Map<Integer, Object>> results = new LinkedList<Map<Integer, Object>>();
-        
+
+        Connection dbConn = null;
         PreparedStatement stmt = null;
         try {
+            dbConn = getConnection();
+//            System.out.println(dbConn);
             stmt = dbConn.prepareStatement(statement);
             fillStatement(stmt, params);
             if (stmt.execute()) {
@@ -279,16 +279,24 @@ public abstract class SqlStorage {
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
+            if (dbConn != null)
+                try {
+                    dbConn.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
         }
         return results;
     }
 
     static int runUpdate(String statement, Object[] params) {
-        checkConn();
         String sql = dbms == Dbms.SQLITE ? statement.replace("INSERT IGNORE", "INSERT OR IGNORE") : statement;
         int result = -1;
+        
+        Connection dbConn = null;
         PreparedStatement stmt = null;
         try {
+            dbConn = getConnection();
             stmt = dbConn.prepareStatement(sql);
             fillStatement(stmt, params);
             stmt.execute();
@@ -303,6 +311,12 @@ public abstract class SqlStorage {
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
+                if(dbConn != null)
+                    try {
+                        dbConn.close();
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
         }
         return result;
     }
@@ -316,15 +330,6 @@ public abstract class SqlStorage {
             if (param != null) {
                 stmt.setObject(i + 1, param);
             }
-        }
-    }
-
-    private static void checkConn() {
-        try {
-            if (dbms == Dbms.MYSQL && (dbConn == null || !dbConn.isValid(1)) )
-                dbConn = dbSource.getConnection();
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
     }
 }
@@ -351,6 +356,7 @@ enum Dbms {
             mds.setUrl(url);
             mds.setCachePreparedStatements(true);
             mds.setPreparedStatementCacheSize(21);
+            mds.setUseServerPrepStmts(true);
 //            mds.setPreparedStatementCacheSqlLimit(308);
             return mds;
         default:
