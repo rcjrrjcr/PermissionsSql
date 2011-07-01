@@ -5,7 +5,6 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.nijiko.permissions.EntryType;
@@ -32,10 +31,10 @@ public class SqlGroupStorage extends SqlEntryStorage implements GroupStorage {
         if(defaultGroup != null) {
             return defaultGroup.equals(name);
         }
-        List<Map<Integer, Object>> results = SqlStorage.runQuery(defGroupText, new Object[]{worldId}, true, 1);
-        Iterator<Map<Integer, Object>> iter = results.iterator();
+        List<Object[]> results = SqlStorage.runQuery(defGroupText, new Object[]{worldId}, true, 1);
+        Iterator<Object[]> iter = results.iterator();
         if(iter.hasNext()) {
-            Object def = iter.next().get(1);
+            Object def = iter.next()[0];
             if(def instanceof Integer) {
                 int defId = (Integer) def;
                 defaultGroup = SqlStorage.getEntryName(defId).name;
@@ -47,11 +46,10 @@ public class SqlGroupStorage extends SqlEntryStorage implements GroupStorage {
 
     @Override
     public Set<String> getTracks() {
-        List<Map<Integer, Object>> results = SqlStorage.runQuery(trackListText, new Object[]{worldId}, false, 1);
-        Iterator<Map<Integer, Object>> iter = results.iterator();
+        List<Object[]> results = SqlStorage.runQuery(trackListText, new Object[]{worldId}, false, 1);
         Set<String> tracks = new LinkedHashSet<String>();
-        while(iter.hasNext()) {
-            Object o = iter.next().get(1);
+        for(Object[] arr : results) {
+            Object o = arr[0];
             if(o instanceof String) {
                 String s = (String) o;
                 if(s.equals("deftrack"))
@@ -67,17 +65,16 @@ public class SqlGroupStorage extends SqlEntryStorage implements GroupStorage {
         if(track == null) {
             track = "deftrack"; //Name of default SQL track
         }
-        List<Map<Integer, Object>> results = SqlStorage.runQuery(trackGetText, new Object[]{worldId, track}, false, 1);
-        Iterator<Map<Integer, Object>> iter = results.iterator();
+        List<Object[]> results = SqlStorage.runQuery(trackGetText, new Object[]{worldId, track}, false, 1);
         LinkedList<GroupWorld> trackGroups = new LinkedList<GroupWorld>();
-        while(iter.hasNext()) {
-            Object oWorld = iter.next().get(1);
-            Object oName = iter.next().get(2);
+        for(Object[] arr : results) {
+            Object oWorld = arr[0];
+            Object oName = arr[1];
             if(oWorld instanceof String && oName instanceof String) {                
                 trackGroups.add(new GroupWorld((String)oWorld, (String)oName));
             }
         }
-        return null;
+        return trackGroups;
     }
 
     @Override

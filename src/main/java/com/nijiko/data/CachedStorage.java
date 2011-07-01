@@ -76,6 +76,12 @@ public abstract class CachedStorage implements Storage {
         parents.get(name).remove(gw);
         getWrapped().removeParent(name, groupWorld, groupName);                
     }
+    
+    @Override
+    public void setParents(String name, LinkedHashSet<GroupWorld> groupWs) {
+        parents.put(name, groupWs);
+        getWrapped().setParents(name, groupWs);
+    }
 
     @Override
     public Set<String> getEntries() {

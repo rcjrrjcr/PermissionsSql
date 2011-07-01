@@ -1,8 +1,10 @@
 package com.nijiko.data;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +28,8 @@ public abstract class SqlEntryStorage implements Storage {
     protected static final String maxParentText = "SELECT MAX(parentorder) FROM PrInheritance WHERE childid = ?;";
     protected static final String parentAddText = "INSERT IGNORE INTO PrInheritance (childid, parentid, parentorder) VALUES (?,?,?);";
     protected static final String parentRemText = "DELETE FROM PrInheritance WHERE childid = ? AND parentid = ?;";
+
+    protected static final String parentRemAllText = "DELETE FROM PrInheritance WHERE childid = ?;";
 
     protected static final String entryListText = "SELECT name, entryid FROM PrEntries WHERE worldid = ? AND type = ?;";
     protected static final String entryDelText = "DELETE FROM PrEntries WHERE worldid = ? AND entryid = ?;";
@@ -51,10 +55,10 @@ public abstract class SqlEntryStorage implements Storage {
                 e.printStackTrace();
                 return permissions;
             }
-            List<Map<Integer, Object>> results = SqlStorage.runQuery(permGetText, new Object[] { id }, false, 1);
+            List<Object[]> results = SqlStorage.runQuery(permGetText, new Object[] { id }, false, 1);
             if (results != null) {
-                for (Map<Integer, Object> row : results) {
-                    Object o = row.get(1);
+                for (Object[] row : results) {
+                    Object o = row[0];
                     if (o instanceof String) {
                         permissions.add((String) o);
                     }
@@ -75,10 +79,10 @@ public abstract class SqlEntryStorage implements Storage {
                 e.printStackTrace();
                 return parents;
             }
-            List<Map<Integer, Object>> results = SqlStorage.runQuery(parentGetText, new Object[] { uid }, false, 1);
+            List<Object[]> results = SqlStorage.runQuery(parentGetText, new Object[] { uid }, false, 1);
             if (results != null) {
-                for (Map<Integer, Object> row : results) {
-                    Object o = row.get(1);
+                for (Object[] row : results) {
+                    Object o = row[0];
                     if (o instanceof Integer) {
                         int groupid = (Integer) o;
                         NameWorldId nw;
@@ -130,14 +134,14 @@ public abstract class SqlEntryStorage implements Storage {
             return;
         }
         int parentOrder = 0;
-        List<Map<Integer, Object>> results = SqlStorage.runQuery(maxParentText, new Object[] {uid}, true, 1);
-        if(results != null && !results.isEmpty()) {
-            Object o = results.get(0).get(1);
-            if(o instanceof Integer) {
+        List<Object[]> results = SqlStorage.runQuery(maxParentText, new Object[] { uid }, true, 1);
+        if (results != null && !results.isEmpty()) {
+            Object o = results.get(0)[0];
+            if (o instanceof Integer) {
                 parentOrder = (Integer) o;
             }
         }
-        parentOrder ++;
+        parentOrder++;
         SqlStorage.runUpdate(parentAddText, new Object[] { uid, gid, parentOrder });
     }
 
@@ -156,12 +160,53 @@ public abstract class SqlEntryStorage implements Storage {
     }
 
     @Override
+    public void setParents(String name, LinkedHashSet<GroupWorld> groupWs) {
+        int uid;
+        int[] gids = new int[groupWs.size()];
+        Connection conn = null;
+        try {
+            uid = getId(name);
+            int i = 0;
+            for (GroupWorld gw : groupWs) {
+                i++;
+                gids[i] = SqlStorage.getEntry(gw.getWorld(), gw.getName(), true);
+            }
+
+            conn = SqlStorage.getConnection();
+            conn.setAutoCommit(false);
+
+            SqlStorage.runUpdate(conn, parentRemAllText, new Object[] { uid });
+
+            Object[] pair = new Object[2];
+            pair[0] = uid;
+
+            for (int gid : gids) {
+                pair[1] = gid;
+                SqlStorage.runUpdate(conn, parentAddText, pair);
+            }
+            conn.commit();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return;
+        } finally {
+            if (conn != null)
+                try {
+                    conn.setAutoCommit(true);
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+        }
+        // TODO
+    }
+
+    @Override
     public Set<String> getEntries() {
         if (idCache.isEmpty()) {
-            List<Map<Integer, Object>> results = SqlStorage.runQuery(entryListText, new Object[] { worldId, (byte) (this.getType() == EntryType.GROUP ? 1 : 0) }, false, 1, 2);
-            for (Map<Integer, Object> row : results) {
-                Object oName = row.get(1);
-                Object oId = row.get(2);
+            List<Object[]> results = SqlStorage.runQuery(entryListText, new Object[] { worldId, (byte) (this.getType() == EntryType.GROUP ? 1 : 0) }, false, 1, 2);
+            for (Object[] row : results) {
+                Object oName = row[0];
+                Object oId = row[1];
                 if (oName instanceof String && oId instanceof Integer) {
                     idCache.put((String) oName, (Integer) oId);
                 }
@@ -209,12 +254,12 @@ public abstract class SqlEntryStorage implements Storage {
         }
         return false;
     }
-    
+
     @Override
     public boolean delete(String name) {
         int id = idCache.remove(name);
-        int val = SqlStorage.runUpdate(entryDelText, new Object[] {worldId, id});
-        return val != 0;        
+        int val = SqlStorage.runUpdate(entryDelText, new Object[] { worldId, id });
+        return val != 0;
     }
 
     @Override
@@ -227,9 +272,9 @@ public abstract class SqlEntryStorage implements Storage {
             e.printStackTrace();
             return data;
         }
-        List<Map<Integer, Object>> results = SqlStorage.runQuery(dataGetText, new Object[] { uid, path }, true, 1);
-        for (Map<Integer, Object> row : results) {
-            Object o = row.get(1);
+        List<Object[]> results = SqlStorage.runQuery(dataGetText, new Object[] { uid, path }, true, 1);
+        for (Object[] row : results) {
+            Object o = row[0];
             if (o instanceof String) {
                 data = (String) o;
             }
@@ -240,7 +285,7 @@ public abstract class SqlEntryStorage implements Storage {
     @Override
     public Integer getInt(String name, String path) {
         String raw = getString(name, path);
-        if(raw == null)
+        if (raw == null)
             return null;
         Integer value;
         try {
@@ -254,7 +299,7 @@ public abstract class SqlEntryStorage implements Storage {
     @Override
     public Double getDouble(String name, String path) {
         String raw = getString(name, path);
-        if(raw == null)
+        if (raw == null)
             return null;
         Double value;
         try {
@@ -268,9 +313,9 @@ public abstract class SqlEntryStorage implements Storage {
     @Override
     public Boolean getBool(String name, String path) {
         String raw = getString(name, path);
-        if(raw == null)
+        if (raw == null)
             return null;
-        if(raw.equalsIgnoreCase("true")) {
+        if (raw.equalsIgnoreCase("true")) {
             return true;
         } else if (raw.equalsIgnoreCase("false")) {
             return false;

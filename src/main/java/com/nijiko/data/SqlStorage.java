@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -33,7 +34,7 @@ public abstract class SqlStorage {
     static final String getWorldName = "SELECT worldname FROM PrWorlds WHERE worldid = ?;";
     static final String getEntryName = "SELECT name, worldid FROM PrEntries WHERE entryid = ?;";
 
-    //XXX: Connection objects aren't really thread safe. Either use connection pools or ThreadLocal
+    // XXX: Connection objects aren't really thread safe. Either use connection pools or ThreadLocal
     private static ConnectionPool pool;
 
     static {
@@ -56,7 +57,6 @@ public abstract class SqlStorage {
             return;
         }
 
-        
         System.out.println("[Permissions] Initializing Permissions 3 SQL interface.");
         // SqlStorage.reloadDelay = reloadDelay;
         try {
@@ -125,17 +125,17 @@ public abstract class SqlStorage {
             return worldMap.get(name);
         }
         Object[] params = new Object[] { name };
-        List<Map<Integer, Object>> results = runQuery(getWorld, params, true, 1);
+        List<Object[]> results = runQuery(getWorld, params, true, 1);
         if (results.isEmpty()) {
             System.out.println("[Permissions] Creating world '" + name + "'.");
             runUpdate(createWorld, params);
             results = runQuery(getWorld, params, true, 1);
         }
         int id = -1;
-        Iterator<Map<Integer, Object>> iter = results.iterator();
+        Iterator<Object[]> iter = results.iterator();
         // System.out.println(results);
         if (iter.hasNext()) {
-            Object o = iter.next().get(1);
+            Object o = iter.next()[0];
             if (o instanceof Integer) {
                 id = (Integer) o;
             }
@@ -152,16 +152,16 @@ public abstract class SqlStorage {
         }
         int worldid = getWorld(world);
         Object[] params = new Object[] { worldid, (byte) (isGroup ? 1 : 0), name };
-        List<Map<Integer, Object>> results = runQuery(getEntry, params, true, 1);
+        List<Object[]> results = runQuery(getEntry, params, true, 1);
         if (results.isEmpty()) {
             System.out.println("[Permissions] Creating " + (isGroup ? "group" : "user") + " '" + name + "' in world '" + world + "'.");
             runUpdate(createEntry, params);
             results = runQuery(getEntry, params, true, 1);
         }
         int id = -1;
-        Iterator<Map<Integer, Object>> iter = results.iterator();
+        Iterator<Object[]> iter = results.iterator();
         if (iter.hasNext()) {
-            Object o = iter.next().get(1);
+            Object o = iter.next()[0];
             if (o instanceof Integer) {
                 id = (Integer) o;
             }
@@ -170,11 +170,11 @@ public abstract class SqlStorage {
     }
 
     static String getWorldName(int id) {
-        List<Map<Integer, Object>> results = runQuery(getWorldName, new Object[] { id }, true, 1);
-        Iterator<Map<Integer, Object>> iter = results.iterator();
+        List<Object[]> results = runQuery(getWorldName, new Object[] { id }, true, 1);
+        Iterator<Object[]> iter = results.iterator();
         String name = "Error";
         if (iter.hasNext()) {
-            Object o = iter.next().get(1);
+            Object o = iter.next()[0];
             if (o instanceof String)
                 name = (String) o;
         }
@@ -183,17 +183,17 @@ public abstract class SqlStorage {
     }
 
     static NameWorldId getEntryName(int id) {
-        List<Map<Integer, Object>> results = runQuery(getEntryName, new Object[] { id }, true, 1, 2);
-        Iterator<Map<Integer, Object>> iter = results.iterator();
+        List<Object[]> results = runQuery(getEntryName, new Object[] { id }, true, 1, 2);
+        Iterator<Object[]> iter = results.iterator();
         NameWorldId nw = new NameWorldId();
         if (!iter.hasNext()) {
             nw.name = "Error";
             nw.worldid = -1;
             return nw;
         }
-        Map<Integer, Object> row = iter.next();
-        Object oName = row.get(1);
-        Object oWId = row.get(2);
+        Object[] row = iter.next();
+        Object oName = row[0]; //Offset by -1 due to zero-indexed array
+        Object oWId = row[1];
         String name = null;
         int worldid = -1;
         if (oName instanceof String && oWId instanceof Integer) {
@@ -243,25 +243,40 @@ public abstract class SqlStorage {
         public String name;
     }
 
-    static List<Map<Integer, Object>> runQuery(String statement, Object[] params, boolean single, int... dataCols) {
+    static List<Object[]> runQuery(String statement, Object[] params, boolean single, int... dataCols) {
+        Connection dbConn;
+        try {
+            dbConn = getConnection();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return new ArrayList<Object[]>();
+        }
+        List<Object[]> data = runQuery(dbConn, statement, params, single, dataCols);
+        try {
+            if (dbConn != null)
+                dbConn.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return data;
+    }
+
+    static List<Object[]> runQuery(Connection dbConn, String statement, Object[] params, boolean single, int... dataCols) {
         if (dataCols == null || dataCols.length == 0) {
             return null;
         }
-        List<Map<Integer, Object>> results = new LinkedList<Map<Integer, Object>>();
+        List<Object[]> results = new LinkedList<Object[]>();
 
-        Connection dbConn = null;
         PreparedStatement stmt = null;
         try {
-            dbConn = getConnection();
-//            System.out.println(dbConn);
             stmt = dbConn.prepareStatement(statement);
             fillStatement(stmt, params);
             if (stmt.execute()) {
                 ResultSet rs = stmt.getResultSet();
                 while (rs.next()) {
-                    Map<Integer, Object> row = new HashMap<Integer, Object>();
-                    for (int index : dataCols) {
-                        row.put(index, rs.getObject(index));
+                    Object[] row = new Object[dataCols.length];
+                    for (int i = 0; i < dataCols.length; i++) {
+                        row[i] = rs.getObject(dataCols[i]);
                         if (dbms == Dbms.MYSQL && rs.isClosed())
                             break;
                     }
@@ -273,15 +288,9 @@ public abstract class SqlStorage {
         } catch (SQLException e) {
             e.printStackTrace();
         } finally {
-            if(stmt != null)
+            if (stmt != null)
                 try {
                     stmt.close();
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
-            if (dbConn != null)
-                try {
-                    dbConn.close();
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
@@ -290,13 +299,30 @@ public abstract class SqlStorage {
     }
 
     static int runUpdate(String statement, Object[] params) {
-        String sql = dbms == Dbms.SQLITE ? statement.replace("INSERT IGNORE", "INSERT OR IGNORE") : statement;
-        int result = -1;
-        
-        Connection dbConn = null;
-        PreparedStatement stmt = null;
+        Connection dbConn;
         try {
             dbConn = getConnection();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return -1;
+        }
+        int data = runUpdate(dbConn, statement, params);
+        try {
+            if (dbConn != null)
+                dbConn.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return data;
+        
+    }
+    
+    static int runUpdate(Connection dbConn, String statement, Object[] params) {
+        String sql = dbms == Dbms.SQLITE ? statement.replace("INSERT IGNORE", "INSERT OR IGNORE") : statement;
+        int result = -1;
+
+        PreparedStatement stmt = null;
+        try {
             stmt = dbConn.prepareStatement(sql);
             fillStatement(stmt, params);
             stmt.execute();
@@ -305,18 +331,12 @@ public abstract class SqlStorage {
             e.printStackTrace();
             result = -1;
         } finally {
-            if(stmt != null)
+            if (stmt != null)
                 try {
                     stmt.close();
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
-                if(dbConn != null)
-                    try {
-                        dbConn.close();
-                    } catch (SQLException e) {
-                        e.printStackTrace();
-                    }
         }
         return result;
     }
@@ -357,7 +377,7 @@ enum Dbms {
             mds.setCachePreparedStatements(true);
             mds.setPreparedStatementCacheSize(21);
             mds.setUseServerPrepStmts(true);
-//            mds.setPreparedStatementCacheSqlLimit(308);
+            // mds.setPreparedStatementCacheSqlLimit(308);
             return mds;
         default:
         case SQLITE:
