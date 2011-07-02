@@ -45,7 +45,7 @@ public abstract class SqlStorage {
         create.add("CREATE TABLE IF NOT EXISTS PrWorldBase (" + " worldid INTEGER NOT NULL," + " defaultid INTEGER," + " FOREIGN KEY(worldid) REFERENCES PrWorlds(worldid) ON DELETE CASCADE ON UPDATE CASCADE," + " FOREIGN KEY(defaultid) REFERENCES PrEntries(entryid) ON DELETE CASCADE ON UPDATE CASCADE" + ")");
         create.add("CREATE TABLE IF NOT EXISTS PrData (" + " dataid INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT," + " entryid INTEGER NOT NULL ," + " path VARCHAR(64) NOT NULL," + " data VARCHAR(64) NOT NULL," + " CONSTRAINT PrDataUnique UNIQUE (entryid, path)," + " FOREIGN KEY(entryid) REFERENCES PrEntries(entryid) ON DELETE CASCADE ON UPDATE CASCADE" + ")");
         create.add("CREATE TABLE IF NOT EXISTS PrTracks (" + " trackid INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT," + " trackname VARCHAR(64) NOT NULL UNIQUE," + " worldid INTEGER NOT NULL," + " CONSTRAINT TracksUnique UNIQUE (trackid, worldid)," + " FOREIGN KEY(worldid) REFERENCES PrWorlds(worldid) ON DELETE CASCADE ON UPDATE CASCADE" + ")");
-        create.add("CREATE TABLE IF NOT EXISTS PrTrackGroups (" + " trackgroupid INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT," + " trackid INTEGER NOT NULL," + " gid INTEGER NOT NULL," + " groupOrder INTEGER NOT NULL," + " CONSTRAINT TrackGroupsUnique UNIQUE (trackid, gid)," + " FOREIGN KEY(trackid) REFERENCES PrTracks(trackid) ON DELETE CASCADE ON UPDATE CASCADE," + " FOREIGN KEY(gid) REFERENCES PrEntries(entryid) ON DELETE CASCADE ON UPDATE CASCADE" + ")");
+        create.add("CREATE TABLE IF NOT EXISTS PrTrackGroups (" + " trackgroupid INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT," + " trackid INTEGER NOT NULL," + " gid INTEGER NOT NULL," + " groupOrder INTEGER NOT NULL," + " CONSTRAINT TrackGroupsUnique UNIQUE (trackname, gid)," + " FOREIGN KEY(trackid) REFERENCES PrTracks(trackid) ON DELETE CASCADE ON UPDATE CASCADE," + " FOREIGN KEY(gid) REFERENCES PrEntries(entryid) ON DELETE CASCADE ON UPDATE CASCADE" + ")");
     }
 
     static Dbms getDbms() {
@@ -71,8 +71,8 @@ public abstract class SqlStorage {
             throw new Exception("[Permissions] Unable to load SQL driver!", e);
         }
         dbSource = dbms.getSource(username, password, uri);
-        verifyAndCreateTables();
         pool = ConnectionPool.newInstance(dbSource, 5);
+        verifyAndCreateTables();
         init = true;
         clearWorldCache();
     }
@@ -88,7 +88,7 @@ public abstract class SqlStorage {
         Connection dbConn = null;
         Statement s = null;
         try {
-            dbConn = SqlStorage.dbSource.getConnection();
+            dbConn = SqlStorage.getConnection();
             s = dbConn.createStatement();
             if (dbms == Dbms.SQLITE) {
                 s.execute("PRAGMA foreign_keys = ON;");
