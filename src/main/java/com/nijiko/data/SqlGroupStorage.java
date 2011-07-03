@@ -65,7 +65,7 @@ public class SqlGroupStorage extends SqlEntryStorage implements GroupStorage {
         if(track == null) {
             track = "deftrack"; //Name of default SQL track
         }
-        List<Object[]> results = SqlStorage.runQuery(trackGetText, new Object[]{worldId, track}, false, 1, 1);
+        List<Object[]> results = SqlStorage.runQuery(trackGetText, new Object[]{worldId, track}, false, 1, 2);
         LinkedList<GroupWorld> trackGroups = new LinkedList<GroupWorld>();
         for(Object[] arr : results) {
             Object oWorld = arr[0];
